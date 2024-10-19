@@ -2,19 +2,22 @@
 #if !SOUP_WASM
 
 #if SOUP_X86
-	#include "string.hpp"
+#include "string.hpp"
 
-	#if defined(_MSC_VER) && !defined(__clang__)
-		#include <intrin.h>
-	#else
-		#include <cpuid.h>
-	#endif
+#if defined(_MSC_VER) && !defined(__clang__)
+#include <intrin.h>
+#else
+#include <cpuid.h>
+#endif
 #elif SOUP_ARM
-	#if SOUP_WINDOWS
-		#include <windows.h>
-	#else
-		#include <sys/auxv.h>
-	#endif
+#if SOUP_WINDOWS
+#include <windows.h>
+#elif defined(__APPLE__)
+#include <sys/types.h>
+#include <sys/sysctl.h>
+#else
+#include <sys/auxv.h>
+#endif
 #endif
 
 NAMESPACE_SOUP
@@ -22,15 +25,15 @@ NAMESPACE_SOUP
 	CpuInfo::CpuInfo() noexcept
 	{
 #if SOUP_X86
-	#define EAX arr[0]
-	#define EBX arr[1]
-	#define EDX arr[2]
-	#define ECX arr[3]
+#define EAX arr[0]
+#define EBX arr[1]
+#define EDX arr[2]
+#define ECX arr[3]
 
 		char buf[17];
 		buf[16] = 0;
 		invokeCpuid(buf, 0);
-		cpuid_max_eax = *reinterpret_cast<uint32_t*>(&buf[0]);
+		cpuid_max_eax = *reinterpret_cast<uint32_t *>(&buf[0]);
 		vendor_id = &buf[4];
 
 		uint32_t arr[4];
@@ -68,28 +71,33 @@ NAMESPACE_SOUP
 			extended_features_1_ecx = ECX;
 		}
 
-	#undef EAX
-	#undef EBX
-	#undef EDX
-	#undef ECX
+#undef EAX
+#undef EBX
+#undef EDX
+#undef ECX
 #elif SOUP_ARM
-	#if SOUP_WINDOWS
+#if SOUP_WINDOWS
 		armv8_aes = IsProcessorFeaturePresent(PF_ARM_V8_CRYPTO_INSTRUCTIONS_AVAILABLE);
 		armv8_sha1 = IsProcessorFeaturePresent(PF_ARM_V8_CRYPTO_INSTRUCTIONS_AVAILABLE);
 		armv8_sha2 = IsProcessorFeaturePresent(PF_ARM_V8_CRYPTO_INSTRUCTIONS_AVAILABLE);
 		armv8_crc32 = IsProcessorFeaturePresent(PF_ARM_V8_CRC32_INSTRUCTIONS_AVAILABLE);
-	#elif SOUP_BITS == 32
+#elif SOUP_BITS == 32
 		armv8_aes = false;
 		armv8_sha1 = false;
 		armv8_sha2 = false;
 		armv8_crc32 = false;
-	#else
+#elif defined(__APPLE__)
+		armv8_aes = false;
+		armv8_sha1 = false;
+		armv8_sha2 = false;
+		armv8_crc32 = false;
+#else
 		// These HWCAP_* are only defined on aarch64.
 		armv8_aes = getauxval(AT_HWCAP) & HWCAP_AES;
 		armv8_sha1 = getauxval(AT_HWCAP) & HWCAP_SHA1;
 		armv8_sha2 = getauxval(AT_HWCAP) & HWCAP_SHA2;
 		armv8_crc32 = getauxval(AT_HWCAP) & HWCAP_CRC32;
-	#endif
+#endif
 #endif
 	}
 
@@ -117,13 +125,13 @@ NAMESPACE_SOUP
 
 				if (cpuid_max_eax >= 0x16)
 				{
-					str.append("\nBase Frequency: ").append(std::to_string(base_frequency)).append(
-						" MHz\n"
-						"Max. Frequency: "
-					).append(std::to_string(max_frequency)).append(
-						" MHz\n"
-						"Bus (Reference) Frequency: "
-					).append(std::to_string(bus_frequency)).append(" MHz");
+					str.append("\nBase Frequency: ").append(std::to_string(base_frequency)).append(" MHz\n"
+																								   "Max. Frequency: ")
+						.append(std::to_string(max_frequency))
+						.append(" MHz\n"
+								"Bus (Reference) Frequency: ")
+						.append(std::to_string(bus_frequency))
+						.append(" MHz");
 				}
 			}
 		}
@@ -145,25 +153,25 @@ NAMESPACE_SOUP
 	}
 
 #if SOUP_X86
-	void CpuInfo::invokeCpuid(void* out, uint32_t eax) noexcept
+	void CpuInfo::invokeCpuid(void *out, uint32_t eax) noexcept
 	{
-	#if defined(_MSC_VER) && !defined(__clang__)
-		__cpuid(((int*)out), eax);
-		std::swap(((int*)out)[2], ((int*)out)[3]);
-	#else
-		__cpuid(eax, ((int*)out)[0], ((int*)out)[1], ((int*)out)[3], ((int*)out)[2]);
-	#endif
+#if defined(_MSC_VER) && !defined(__clang__)
+		__cpuid(((int *)out), eax);
+		std::swap(((int *)out)[2], ((int *)out)[3]);
+#else
+		__cpuid(eax, ((int *)out)[0], ((int *)out)[1], ((int *)out)[3], ((int *)out)[2]);
+#endif
 	}
 
-	void CpuInfo::invokeCpuid(void* out, uint32_t eax, uint32_t ecx) noexcept
+	void CpuInfo::invokeCpuid(void *out, uint32_t eax, uint32_t ecx) noexcept
 	{
-	#if defined(__GNUC__)
-		((uint32_t*)out)[3] = ecx;
-		__get_cpuid(eax, &((uint32_t*)out)[0], &((uint32_t*)out)[1], &((uint32_t*)out)[3], &((uint32_t*)out)[2]);
-	#else
-		__cpuidex(((int*)out), eax, ecx);
-		std::swap(((int*)out)[2], ((int*)out)[3]);
-	#endif
+#if defined(__GNUC__)
+		((uint32_t *)out)[3] = ecx;
+		__get_cpuid(eax, &((uint32_t *)out)[0], &((uint32_t *)out)[1], &((uint32_t *)out)[3], &((uint32_t *)out)[2]);
+#else
+		__cpuidex(((int *)out), eax, ecx);
+		std::swap(((int *)out)[2], ((int *)out)[3]);
+#endif
 	}
 #endif
 }

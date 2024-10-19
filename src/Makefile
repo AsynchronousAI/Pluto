@@ -69,7 +69,7 @@ $(LUA_A): $(BASE_O)
 	$(RANLIB) $@
 
 $(LUA_SO): $(BASE_O) $(LUA_A)
-	$(CXX) -shared -Wl,-soname,$(LUA_SO) -o $@ $? ${LIBS}
+	$(CXX) -shared -Wl,-install_name,$(LUA_SO) -o $@ $? ${LIBS}
 
 $(LUA_T): $(LUA_O) $(LUA_A)
 	$(CXX) -o $@ $(LDFLAGS) $(LUA_O) $(LUA_A) $(LIBS)
